@@ -99,11 +99,22 @@ blockquote { margin-top: 10px; padding: 10px 12px; font-style: italic; font-size
 time { display: block; margin-top: 8px; font-size: 12px; letter-spacing: .1em; color: var(--gold-light); text-align: right; }
 
 /* A–Z */
-.az { list-style: none; text-align: left; background: rgba(255,255,255,.75); border: 1px solid var(--pink-200); border-radius: 18px; padding: 6px 18px; counter-reset: n; animation: up .45s both; }
-.az li { counter-increment: n; display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--pink-300); font-size: 18px; }
+.az { list-style: none; text-align: left; background: rgba(255,255,255,.75); border: 1px solid var(--pink-200); border-radius: 18px; padding: 6px 18px; animation: up .45s both; }
+.az li { display: flex; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--pink-300); font-size: 18px; }
 .az li:last-child { border-bottom: 0; }
-.az li::before { content: counter(n); min-width: 26px; font-size: 13px; color: var(--gold-light); }
+.az .num { flex: none; min-width: 26px; font-size: 13px; color: var(--gold-light); }
+.az-nome { display: grid; gap: 4px; }
+.az-nome em { font-size: 15px; line-height: 1.4; color: #8f2a59; }
 .az small { margin-left: auto; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold-light); }
+
+/* filtro de recados e scroll infinito */
+.filtros { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 14px; }
+.chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--pink-300); background: rgba(255,255,255,.7); font-size: 14px; letter-spacing: .04em; transition: background .2s, color .2s; }
+.chip.on { background: var(--pink-300); border-color: var(--gold); color: #fff; font-weight: 600; }
+.contagem { font-size: 12px; letter-spacing: .12em; color: var(--gold-dark); white-space: nowrap; }
+.carregando { padding: 26px 0 6px; animation: blink 1.4s ease-in-out infinite; }
+.fim { margin-top: 22px; font-size: 13px; letter-spacing: .3em; text-transform: uppercase; color: var(--gold-light); }
+@keyframes blink { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
 
 .vazio { font-style: italic; font-size: 19px; padding: 36px 10px; }
 .acoes { display: grid; gap: 10px; max-width: 360px; margin: 34px auto 0; }

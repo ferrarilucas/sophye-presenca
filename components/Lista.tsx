@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Rsvp } from "@/lib/data";
 import { sair } from "@/app/actions";
@@ -7,6 +7,7 @@ import { Ornament } from "./Ornament";
 
 type Aba = "sim" | "nao";
 type Modo = "grupos" | "az";
+const LOTE: Record<Modo, number> = { grupos: 10, az: 30 };
 type Grupo = { id: string; quando: string; pessoas: Rsvp[]; mensagem: string | null };
 
 const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -42,6 +43,9 @@ export default function Lista({ rows }: { rows: Rsvp[] }) {
   const [aba, setAba] = useState<Aba>("sim");
   const [modo, setModo] = useState<Modo>("grupos");
   const [busca, setBusca] = useState("");
+  const [soRecados, setSoRecados] = useState(false);
+  const [visiveis, setVisiveis] = useState(LOTE.grupos);
+  const sentinela = useRef<HTMLDivElement>(null);
 
   const sim = useMemo(() => rows.filter((r) => r.vai), [rows]);
   const nao = useMemo(() => rows.filter((r) => !r.vai), [rows]);
@@ -49,15 +53,35 @@ export default function Lista({ rows }: { rows: Rsvp[] }) {
   const recados = useMemo(() => rows.filter((r) => r.mensagem).length, [rows]);
 
   const atual = aba === "sim" ? sim : nao;
+  const recadosAba = atual.filter((r) => r.mensagem).length;
   const q = norm(busca.trim());
-  const filtradas = q ? atual.filter((r) => norm(r.nome).includes(q) || norm(r.mensagem ?? "").includes(q)) : atual;
+  const filtradas = useMemo(() => {
+    let rs = soRecados ? atual.filter((r) => r.mensagem) : atual;
+    if (q) rs = rs.filter((r) => norm(r.nome).includes(q) || norm(r.mensagem ?? "").includes(q));
+    return rs;
+  }, [atual, soRecados, q]);
+  // na visão por grupo, mostra o grupo inteiro de quem passou nos filtros
   const grupos = useMemo(() => {
-    if (!q) return agrupar(filtradas);
-    // na busca, mostra o grupo inteiro de quem bateu
     const ids = new Set(filtradas.map((r) => r.grupo));
     return agrupar(atual.filter((r) => ids.has(r.grupo)));
-  }, [filtradas, atual, q]);
+  }, [filtradas, atual]);
   const az = useMemo(() => [...filtradas].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")), [filtradas]);
+
+  const total = modo === "grupos" ? grupos.length : az.length;
+  const lote = LOTE[modo];
+  const temMais = visiveis < total;
+
+  // qualquer mudança de filtro recomeça o feed do início
+  useEffect(() => setVisiveis(LOTE[modo]), [aba, modo, q, soRecados]);
+
+  // scroll infinito: quando o fim da lista chega perto da tela, mostra o próximo lote
+  useEffect(() => {
+    const el = sentinela.current;
+    if (!el || !temMais) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setVisiveis((v) => v + lote), { rootMargin: "400px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [temMais, lote, visiveis]);
 
   return (
     <main className="page lista">
@@ -93,12 +117,23 @@ export default function Lista({ rows }: { rows: Rsvp[] }) {
         </div>
       </div>
 
+      <div className="filtros">
+        <button className={`chip ${soRecados ? "on" : ""}`} aria-pressed={soRecados} onClick={() => setSoRecados(!soRecados)}>
+          💌 Só com recados · {recadosAba}
+        </button>
+        {total > 0 && <span className="contagem">{total} {modo === "grupos" ? (total === 1 ? "resposta" : "respostas") : (total === 1 ? "pessoa" : "pessoas")}</span>}
+      </div>
+
       {filtradas.length === 0 ? (
-        <p className="vazio">{q ? "Ninguém encontrado com esse nome." : aba === "sim" ? "Ainda sem confirmações. Logo, logo chegam 💗" : "Ninguém recusou até agora 🥰"}</p>
+        <p className="vazio">
+          {q ? "Ninguém encontrado com esse nome."
+            : soRecados ? "Nenhum recado por aqui ainda 💗"
+            : aba === "sim" ? "Ainda sem confirmações. Logo, logo chegam 💗" : "Ninguém recusou até agora 🥰"}
+        </p>
       ) : modo === "grupos" ? (
         <ul className="grupos" key={aba + modo}>
-          {grupos.map((g, i) => (
-            <li key={g.id} className={`card ${aba}`} style={{ animationDelay: `${Math.min(i, 12) * 0.05}s` }}>
+          {grupos.slice(0, visiveis).map((g, i) => (
+            <li key={g.id} className={`card ${aba}`} style={{ animationDelay: `${(i % lote) * 0.05}s` }}>
               <div className="card-head">
                 <span className="titular">{g.pessoas[0].nome}</span>
                 {g.pessoas.length > 1 && <span className="pill">{g.pessoas.length} pessoas</span>}
@@ -115,14 +150,22 @@ export default function Lista({ rows }: { rows: Rsvp[] }) {
         </ul>
       ) : (
         <ol className="az" key={aba + modo}>
-          {az.map((p) => (
+          {az.slice(0, visiveis).map((p, i) => (
             <li key={p.id}>
-              <span>{p.nome}</span>
+              <span className="num">{i + 1}</span>
+              <div className="az-nome">
+                <span>{p.nome}</span>
+                {soRecados && p.mensagem && <em>“{p.mensagem}”</em>}
+              </div>
               {!p.titular && <small>acompanhante</small>}
             </li>
           ))}
         </ol>
       )}
+
+      {total > 0 && (temMais
+        ? <div ref={sentinela} className="carregando" aria-hidden><Ornament /></div>
+        : total > lote && <p className="fim">❦ fim da lista ❦</p>)}
 
       <div className="acoes">
         <button className="cta" onClick={() => startTransition(() => router.refresh())} disabled={atualizando}>
@@ -135,3 +178,4 @@ export default function Lista({ rows }: { rows: Rsvp[] }) {
     </main>
   );
 }
+
